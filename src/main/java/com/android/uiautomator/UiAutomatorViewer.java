@@ -27,6 +27,7 @@ import com.android.uiautomator.tree.BasicTreeNodeContentProvider;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.ToolBarManager;
 import org.eclipse.jface.layout.TableColumnLayout;
+import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
@@ -43,6 +44,9 @@ import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.window.ApplicationWindow;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.ControlAdapter;
+import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseMoveListener;
@@ -69,7 +73,6 @@ import org.eclipse.swt.widgets.Tree;
 public class UiAutomatorViewer extends ApplicationWindow {
 
     private static final int FIXED_RHS_WIDTH = 350;
-    private static final int FIXED_DETAIL_VIEW_HEIGHT = 200;
     private static final int IMG_BORDER = 2;
 
     private Canvas mScreenshotCanvas;
@@ -82,6 +85,7 @@ public class UiAutomatorViewer extends ApplicationWindow {
 
     private float mScale = 1.0f;
     private Image mCachedScaleImage = null;
+    private Image mLogoBackgroundImage = null;
 
     /**
      * Create the application window.
@@ -155,7 +159,14 @@ public class UiAutomatorViewer extends ApplicationWindow {
             }
         });
 
-        mScreenshotCanvas.setBackgroundImage(ImageHelper.loadImageDescriptorFromResource("images/logo.png").createImage());
+        // logo 背景图按父控件大小拉伸显示，canvas 尺寸变化时同步更新
+        updateCanvasBackgroundImage();
+        mScreenshotCanvas.addControlListener(new ControlAdapter() {
+            @Override
+            public void controlResized(ControlEvent e) {
+                updateCanvasBackgroundImage();
+            }
+        });
 
         ToolBarManager toolBarManager = new ToolBarManager(SWT.FLAT);
         toolBarManager.add(mOpenFilesAction);
@@ -163,11 +174,15 @@ public class UiAutomatorViewer extends ApplicationWindow {
         toolBarManager.add(mScreenshotAction);
         toolBarManager.createControl(basePane);
 
-        mTreeViewer = new TreeViewer(basePane, SWT.BORDER);
+        // 右侧上下两部分（布局树 / Node Detail）用 SashForm 包裹，可拖拽分隔条调整高度
+        SashForm rightSashForm = new SashForm(basePane, SWT.VERTICAL);
+        GridData gdRightSash = new GridData(SWT.FILL, SWT.FILL, false, true, 1, 2);
+        gdRightSash.widthHint = FIXED_RHS_WIDTH;
+        gdRightSash.minimumWidth = FIXED_RHS_WIDTH;
+        rightSashForm.setLayoutData(gdRightSash);
+
+        mTreeViewer = new TreeViewer(rightSashForm, SWT.BORDER);
         Tree tree = mTreeViewer.getTree();
-        GridData gd_Tree = new GridData(SWT.FILL, SWT.FILL, false, true, 1, 1);
-        gd_Tree.widthHint = 350;
-        tree.setLayoutData(gd_Tree);
         mTreeViewer.setContentProvider(new BasicTreeNodeContentProvider());
         // default LabelProvider uses toString() to generate text to display
         mTreeViewer.setLabelProvider(new LabelProvider());
@@ -188,18 +203,13 @@ public class UiAutomatorViewer extends ApplicationWindow {
         // move focus so that it's not on tool bar (looks weird)
         tree.setFocus();
 
-        Group grpNodeDetail = new Group(basePane, SWT.NONE);
+        Group grpNodeDetail = new Group(rightSashForm, SWT.NONE);
         grpNodeDetail.setLayout(new FillLayout(SWT.HORIZONTAL));
-        GridData gd_grpNodeDetail = new GridData(SWT.LEFT, SWT.CENTER, false, false, 1, 1);
-        gd_grpNodeDetail.heightHint = FIXED_DETAIL_VIEW_HEIGHT;
-        gd_grpNodeDetail.minimumHeight = FIXED_DETAIL_VIEW_HEIGHT;
-        gd_grpNodeDetail.widthHint = FIXED_RHS_WIDTH;
-        gd_grpNodeDetail.minimumWidth = FIXED_RHS_WIDTH;
-        grpNodeDetail.setLayoutData(gd_grpNodeDetail);
         grpNodeDetail.setText("Node Detail");
+        // 初始高度占比：布局树 70% / Node Detail 30%，可由用户拖拽分隔条调整
+        rightSashForm.setWeights(new int[]{70, 30});
 
         Composite tableContainer = new Composite(grpNodeDetail, SWT.NONE);
-        tableContainer.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
 
         TableColumnLayout columnLayout = new TableColumnLayout();
         tableContainer.setLayout(columnLayout);
@@ -242,6 +252,46 @@ public class UiAutomatorViewer extends ApplicationWindow {
             }
         });
         return basePane;
+    }
+
+    /**
+     * 把 logo.png 缩放到与 canvas（父控件）完全一致的大小作为背景显示，
+     * canvas 大小变化时重新生成，并负责释放旧图片资源
+     */
+    private void updateCanvasBackgroundImage() {
+        Rectangle area = mScreenshotCanvas.getClientArea();
+        if (area.width <= 0 || area.height <= 0) {
+            return;
+        }
+        ImageDescriptor descriptor =
+                ImageHelper.loadImageDescriptorFromResource("images/logo.png");
+        if (descriptor == null) {
+            return;
+        }
+        Display display = mScreenshotCanvas.getDisplay();
+        Image scaled = new Image(display, area.width, area.height);
+        GC gc = new GC(scaled);
+        try {
+            gc.setAntialias(SWT.ON);
+            gc.setInterpolation(SWT.HIGH);
+            Image original = descriptor.createImage();
+            try {
+                Rectangle src = original.getBounds();
+                gc.drawImage(original, 0, 0, src.width, src.height,
+                        0, 0, area.width, area.height);
+            } finally {
+                original.dispose();
+            }
+        } finally {
+            gc.dispose();
+        }
+        Image old = mLogoBackgroundImage;
+        mLogoBackgroundImage = scaled;
+        mScreenshotCanvas.setBackgroundImage(scaled);
+        if (old != null && !old.isDisposed()) {
+            old.dispose();
+        }
+        mScreenshotCanvas.redraw();
     }
 
     /**
