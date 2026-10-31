@@ -114,7 +114,7 @@ public class ScreenshotAction extends Action {
                     }
                     monitor.subTask("Deleting old UI XML snapshot ...");
                     procRunner = getAdbRunner(serial,
-                            "shell", "rm", "/sdcard/uidump.xml");
+                            "shell", "rm", "-f", "/sdcard/uidump.xml");
                     try {
                         retCode = procRunner.run(30000);
                         if (retCode != 0) {
@@ -158,7 +158,7 @@ public class ScreenshotAction extends Action {
 
                     monitor.subTask("Deleting old device screenshot...");
                     procRunner = getAdbRunner(serial,
-                            "shell", "rm", "/sdcard/screenshot.png");
+                            "shell", "rm", "-f", "/sdcard/screenshot.png");
                     try {
                         retCode = procRunner.run(30000);
                         if (retCode != 0) {

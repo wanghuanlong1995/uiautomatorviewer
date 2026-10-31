@@ -88,7 +88,9 @@ public class UiAutomatorViewer extends ApplicationWindow {
      */
     public UiAutomatorViewer() {
         super(null);
-        setShellStyle(SWT.DIALOG_TRIM);
+        // SHELL_TRIM = CLOSE | TITLE | MIN | MAX | RESIZE | BORDER
+        // 让窗口具备最小化、最大化按钮，并支持鼠标拖拽调整大小
+        setShellStyle(SWT.SHELL_TRIM);
         createActions();
     }
 
@@ -354,7 +356,7 @@ public class UiAutomatorViewer extends ApplicationWindow {
         if (mScale == 1.0f) {
             return size;
         } else {
-            return new Double(Math.floor((size * mScale))).intValue();
+            return (int) Math.floor((size * mScale));
         }
     }
 
@@ -362,7 +364,7 @@ public class UiAutomatorViewer extends ApplicationWindow {
         if (mScale == 1.0f) {
             return size;
         } else {
-            return new Double(Math.floor((size / mScale))).intValue();
+            return (int) Math.floor((size / mScale));
         }
     }
 

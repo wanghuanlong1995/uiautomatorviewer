@@ -5,18 +5,39 @@ plugins {
 group = 'org.huanlong'
 version = '1.0-SNAPSHOT'
 
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
-
     implementation fileTree(dir: 'libs', include: '*.jar')
-//    testImplementation platform('org.junit:junit-bom:5.10.0')
-//    testImplementation 'org.junit.jupiter:junit-jupiter'
-//    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-test {
-    useJUnitPlatform()
+jar {
+    // 打成可执行 fat jar：直接 java -jar build/libs/uiautomatorviewer.jar 即可运行
+    archiveFileName = 'uiautomatorviewer.jar'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+                'Implementation-Title': 'yangzaiCN uiautomator',
+                'Implementation-Version': project.version,
+                'Main-Class': 'com.android.uiautomator.UiAutomatorViewer'
+        )
+    }
+    // 将 libs 下所有依赖 jar 解包合并进产物
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    // 去掉依赖 jar 里的签名文件，否则合并后运行会报 SecurityException
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }
