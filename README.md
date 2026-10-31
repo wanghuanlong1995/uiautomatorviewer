@@ -81,10 +81,13 @@ adb shell /system/bin/uiautomator dump /sdcard/uidump.xml
 或
 adb shell screencap -p /sdcard/screenshot.png
 ```    
-![1517297801(1).png](http://upload-images.jianshu.io/upload_images/1909684-0cc3d75623af585d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
-#####1.0.1启动方式
+##### 1.0.1 版本的jar启动方式(推荐)
 运行方式简化为
+```
 java -jar uiautomatorviewer.jar
-#####1.0.0启动方式
+```
+##### 1.0.0版本的jar启动方式
+```
 java -cp "build\libs\uiautomatorviewer-1.0-SNAPSHOT.jar;libs\*" com.android.uiautomator.UiAutomatorViewer
+```
