@@ -54,6 +54,7 @@ import org.eclipse.swt.events.PaintEvent;
 import org.eclipse.swt.events.PaintListener;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
@@ -117,7 +118,14 @@ public class UiAutomatorViewer extends ApplicationWindow {
             }
         });
         mScreenshotCanvas.setBackground(getShell().getDisplay().getSystemColor(SWT.COLOR_BLACK));
-        mScreenshotCanvas.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 3));
+        GridData gdCanvas = new GridData(SWT.FILL, SWT.FILL, true, true, 1, 3);
+        // 初始尺寸按 logo 原始大小给提示，配合等比绘制保证背景图不被拉伸
+        Rectangle logoBounds = getLogoBounds();
+        if (logoBounds != null) {
+            gdCanvas.widthHint = logoBounds.width;
+            gdCanvas.heightHint = logoBounds.height;
+        }
+        mScreenshotCanvas.setLayoutData(gdCanvas);
         mScreenshotCanvas.addPaintListener(new PaintListener() {
             @Override
             public void paintControl(PaintEvent e) {
@@ -159,7 +167,7 @@ public class UiAutomatorViewer extends ApplicationWindow {
             }
         });
 
-        // logo 背景图按父控件大小拉伸显示，canvas 尺寸变化时同步更新
+        // logo 背景图等比缩放居中显示（不拉伸），canvas 尺寸变化时同步更新
         updateCanvasBackgroundImage();
         mScreenshotCanvas.addControlListener(new ControlAdapter() {
             @Override
@@ -255,8 +263,26 @@ public class UiAutomatorViewer extends ApplicationWindow {
     }
 
     /**
-     * 把 logo.png 缩放到与 canvas（父控件）完全一致的大小作为背景显示，
-     * canvas 大小变化时重新生成，并负责释放旧图片资源
+     * 读取 logo.png 的原始尺寸，用于计算窗口初始大小和 canvas 提示尺寸。
+     * 旧版 JFace（3.6）的 ImageDescriptor 没有 getBounds()，通过 ImageData 取尺寸
+     */
+    private Rectangle getLogoBounds() {
+        ImageDescriptor descriptor =
+                ImageHelper.loadImageDescriptorFromResource("images/logo.png");
+        if (descriptor == null) {
+            return null;
+        }
+        ImageData data = descriptor.getImageData();
+        if (data == null) {
+            return null;
+        }
+        return new Rectangle(0, 0, data.width, data.height);
+    }
+
+    /**
+     * 把 logo.png 按原始宽高比等比缩放后居中绘制到 canvas 背景上，
+     * 保证任何父控件尺寸下都不拉伸变形（多出的部分为黑底留边）；
+     * canvas 大小变化时重新生成，并释放旧图片资源
      */
     private void updateCanvasBackgroundImage() {
         Rectangle area = mScreenshotCanvas.getClientArea();
@@ -277,8 +303,14 @@ public class UiAutomatorViewer extends ApplicationWindow {
             Image original = descriptor.createImage();
             try {
                 Rectangle src = original.getBounds();
-                gc.drawImage(original, 0, 0, src.width, src.height,
-                        0, 0, area.width, area.height);
+                // 等比缩放：取宽/高中较小的缩放比例，居中绘制，不破坏原始比例
+                float fitScale = Math.min(area.width / (float) src.width,
+                        area.height / (float) src.height);
+                int dw = Math.round(src.width * fitScale);
+                int dh = Math.round(src.height * fitScale);
+                int dx = (area.width - dw) / 2;
+                int dy = (area.height - dh) / 2;
+                gc.drawImage(original, 0, 0, src.width, src.height, dx, dy, dw, dh);
             } finally {
                 original.dispose();
             }
@@ -384,7 +416,13 @@ public class UiAutomatorViewer extends ApplicationWindow {
 
     @Override
     protected Point getInitialSize() {
-        return new Point(800, 600);
+        Rectangle logo = getLogoBounds();
+        if (logo == null) {
+            return new Point(800, 600);
+        }
+        // 宽度 = logo + 右侧面板 + 边框/间距余量；高度 = logo + 标题栏/工具栏余量，
+        // 使 canvas 初始区域尽量接近 logo 宽高比，背景图基本无黑边且不被拉伸
+        return new Point(logo.width + FIXED_RHS_WIDTH + 40, logo.height + 110);
     }
 
 
